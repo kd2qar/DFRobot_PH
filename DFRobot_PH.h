@@ -39,6 +39,17 @@ public:
   void    calibration(float voltage, float temperature,char* cmd);  //calibration by Serial CMD
   void    calibration(float voltage, float temperature);
   /**
+   * @fn calibration
+   * @brief Calibrate the calibration data
+   *
+   * @param voltage     : Voltage value
+   * @param temperature : Ambient temperature
+   * @param mode         : 1 -> enter the PH calibration mode
+   * @n                    2 -> calibrate with the standard buffer solution, two buffer solutions(4.0 and 7.0) will be automaticlly recognized
+   * @n                    3 -> save the calibrated parameters and exit from PH calibration mode
+   */ 
+  void    calibration(float voltage, float temperature, byte mode);
+  /**
    * @fn readPH
    * @brief Convert voltage to PH with temperature compensation
    * @note voltage to pH value, with temperature compensation
@@ -53,6 +64,7 @@ public:
    * @brief Initialization The Analog pH Sensor
    */
   void begin();
+  void begin(unsigned int phValueAddress);
 
 private:
     float  _phValue;
@@ -70,6 +82,8 @@ private:
     byte    cmdParse(const char* cmd);
     byte    cmdParse();
 	char* strupr(char* str);
+private:
+	byte _phValueAddress = 0x0;
 };
 
 #endif
