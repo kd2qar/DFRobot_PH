@@ -64,6 +64,11 @@ public:
    * @brief Initialization The Analog pH Sensor
    */
   void begin();
+  /**
+   * @fn begin
+   * @brief Initialization of the analog pH sensor. Set location for EEPROM storage of calibration values
+   * @param phValueAddress   : EEPROM offset to read and write 8 bytes of saved calibration data
+   */
   void begin(unsigned int phValueAddress);
 
 private:
