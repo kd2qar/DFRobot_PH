@@ -8,6 +8,8 @@
  * @version  V1.0
  * @date  2018-11-06
  * @url https://github.com/DFRobot/DFRobot_PH
+ * MODIFIED 2026-02008
+ * Fixed some bugs that occur when 'unexpected' use cases arise such as not interacting with the serial monitor only
  */
 
 
@@ -23,13 +25,15 @@
 #define EEPROM_write(address, p) {int i = 0; byte *pp = (byte*)&(p);for(; i < sizeof(p); i++) EEPROM.write(address+i, pp[i]);}
 #define EEPROM_read(address, p)  {int i = 0; byte *pp = (byte*)&(p);for(; i < sizeof(p); i++) pp[i]=EEPROM.read(address+i);}
 
-#define PHVALUEADDR 0x00    //the start address of the pH calibration parameters stored in the EEPROM
+// Does not play nicely with others
+//#define PHVALUEADDR 0x00    //the start address of the pH calibration parameters stored in the EEPROM
+#define PHVALUEADDR this->_phValueAddress
 
 char* DFRobot_PH::strupr(char* str) {
     if (str == NULL) return NULL;
     char *ptr = str;
-    while (*ptr != ' ') {
-        *ptr = toupper((unsigned char)*ptr);
+    while (*ptr != '\0') {
+        *ptr = (char) toupper((int)*ptr);
         ptr++;
     }
     return str;
@@ -48,7 +52,20 @@ DFRobot_PH::~DFRobot_PH()
 {
 
 }
-
+/*
+ * Optiomally provide an alternative location to store the EEPROM values.
+ * Everybody picks 0x0 which is safe but WILL conflict if other libraries
+ * rely on the same address.
+ */
+void DFRobot_PH::begin(unsigned int phValueAddress)
+{
+    // Add check for valid address within the current device's EEPROM space.
+    // If the value is too large pick the last 8 bytes of the EEPROM
+    // Note that there is no validation of values performed.
+    // if they are not set to the factory default of 0xff they are assumed to be valid
+    PHVALUEADDR = (phValueAddress<EEPROM.length()-8?phValueAddress:EEPROM.length()-8);
+    begin();
+}
 void DFRobot_PH::begin()
 {
     EEPROM_read(PHVALUEADDR, this->_neutralVoltage);  //load the neutral (pH = 7.0)voltage of the pH board from the EEPROM
@@ -79,7 +96,10 @@ float DFRobot_PH::readPH(float voltage, float temperature)
     return _phValue;
 }
 
-
+/*
+ * This call only works when interacting with the serial monitor. 
+ * It fails to do anything if the member variables are empty.
+ */
 void DFRobot_PH::calibration(float voltage, float temperature,char* cmd)
 {
     this->_voltage = voltage;
@@ -97,7 +117,16 @@ void DFRobot_PH::calibration(float voltage, float temperature)
         phCalibration(cmdParse());  // if received Serial CMD from the serial monitor, enter into the calibration mode
     }
 }
-
+/*
+ * Why waste memory and CPU processing strings
+ */
+void DFRobot_PH::calibration(float voltage, float temperature, byte mode)
+{
+    this->_voltage = voltage;
+    this->_temperature = temperature;
+    if(mode >0 && mode <=3)
+        phCalibration(mode);
+}
 boolean DFRobot_PH::cmdSerialDataAvailable()
 {
     char cmdReceivedChar;
@@ -123,15 +152,12 @@ boolean DFRobot_PH::cmdSerialDataAvailable()
 
 byte DFRobot_PH::cmdParse(const char* cmd)
 {
-    byte modeIndex = 0;
-    if(strstr(cmd, "ENTERPH")      != NULL){
-        modeIndex = 1;
-    }else if(strstr(cmd, "EXITPH") != NULL){
-        modeIndex = 3;
-    }else if(strstr(cmd, "CALPH")  != NULL){
-        modeIndex = 2;
-    }
-    return modeIndex;
+    // The original duplicated the code handling the options.
+    // also it did not work when passing a string literal e.g. cmdParse("enterph");
+    // with lower case characters as the string constant is immutable on the Arduino
+    // copying it to the member function allows the string to be modified
+    strncpy(this->_cmdReceivedBuffer,cmd,10);
+    return cmdParse();
 }
 
 byte DFRobot_PH::cmdParse()
